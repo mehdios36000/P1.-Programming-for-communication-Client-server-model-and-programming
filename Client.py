@@ -48,11 +48,13 @@ def handle_download(client_socket, file_name):
         _, size = response.split(maxsplit=1)
         size = int(size)
         with open(local_path, 'ab') as f:  # Open in append mode
-            data = client_socket.recv(size)
-            f.write(data)
+            received_size = 0
+            while received_size < size:
+                data = client_socket.recv(4096)
+                received_size += len(data)
+                f.write(data)
         print(f"{file_name} has been downloaded successfully.")
-    else:
-        print("Unexpected response from the server.")
+
 
 
 def main():

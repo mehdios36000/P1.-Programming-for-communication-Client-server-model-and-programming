@@ -41,15 +41,23 @@ def handle_download(conn, args):
         with open(file_path, 'rb') as f:
             print("Sending file from offset", offset)
             f.seek(offset)  # Start from the client's offset
-            data = f.read()
-            size = len(data)
-            response = f"OK {size}\n"
+
+            # Get the size to be sent
+            remaining_size = os.path.getsize(file_path) - offset
+            response = f"OK {remaining_size}\n"
             conn.sendall(response.encode())
-            conn.sendall(data)
+
+            # Send the file in chunks
+            chunk_size = 4096
+            while remaining_size > 0:
+                data = f.read(min(chunk_size, remaining_size))
+                conn.sendall(data)
+                remaining_size -= len(data)
     else:
         print("File does not exist")
         error_message = "NOT FOUND\n"
         conn.sendall(error_message.encode())
+
 
 
 def main():
