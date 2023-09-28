@@ -25,6 +25,7 @@ def compute_md5(file_path):
 
 
 def handle_download(client_socket, file_name):
+    '''Handle a download request from the client.'''
     header = f"download {file_name}"
     offset = 0
 
@@ -56,6 +57,36 @@ def handle_download(client_socket, file_name):
         print(f"{file_name} has been downloaded successfully.")
 
 
+def handle_upload(client_socket, file_name):
+    local_path = f"ClientShare/{file_name}"
+    
+    if os.path.exists(local_path):
+        file_hash = compute_md5(local_path)
+        header = f"upload {file_name} {file_hash}\n"
+        client_socket.sendall(header.encode())
+        
+    server_response = recv_line(client_socket)
+    if server_response == "FILE_UNCHANGED":
+        print(f"{file_name} is already up-to-date on the server.")
+    elif server_response == "PROCEED_WITH_UPLOAD":
+        print(f"Uploading {file_name}...")
+        with open(local_path, 'rb') as f:
+            chunk = f.read(4096)
+            while chunk:
+                client_socket.sendall(chunk)
+                chunk = f.read(4096)
+        print(f"{file_name} uploaded successfully!")
+    else:
+        print("Unexpected response from the server.")
+
+
+def list_files(client_socket):
+    header = "list_files\n"
+    client_socket.sendall(header.encode())
+    file_list = client_socket.recv(4096).decode()
+    print("Shareable files:")
+    print(file_list)
+
 
 def main():
     if len(sys.argv) < 2:
@@ -74,28 +105,13 @@ def main():
         client_socket.connect(('localhost', 80))
 
         if command == 'l':  # List all shareable files
-            header = "list_files\n"
-            client_socket.sendall(header.encode())
-            file_list = client_socket.recv(4096).decode()
-            print("Shareable files:")
-            print(file_list)
+          list_files(client_socket)
 
         elif command == 'd':  # Download file
             handle_download(client_socket, file_name)
 
         elif command == 'u':  # Upload file
-            try:
-                local_path = f"ClientShare/{file_name}"
-                with open(local_path, 'rb') as f:
-                    data = f.read()
-                    size = len(data)
-                header = f"upload {file_name} {size}\n"
-                client_socket.sendall(header.encode())
-                client_socket.sendall(data)
-                print(f"{file_name} uploaded successfully!")
-            except FileNotFoundError:
-                print(f"Error: The file {file_name} was not found in the ClientShare directory.")
-
+            handle_upload(client_socket, file_name)
         else:
             print(f"Unknown command: {command}")
 

@@ -24,6 +24,7 @@ def compute_md5(file_path):
 
 
 def handle_download(conn, args):
+    '''Handle a download request from the client.'''
     print("Handling download")
     parts = args[0].split()
     file_name = parts[0]
@@ -58,6 +59,37 @@ def handle_download(conn, args):
         error_message = "NOT FOUND\n"
         conn.sendall(error_message.encode())
 
+def handle_upload(conn, args):
+    '''Handle an upload request from the client.'''
+    parts = args[0].split()
+    file_name = parts[0]
+    client_hash = parts[1]
+    file_path = f"ServerShare/{file_name}"
+
+    
+    if os.path.exists(file_path):
+        server_hash = compute_md5(file_path)
+        if client_hash == server_hash:
+            conn.sendall(b"FILE_UNCHANGED\n")
+            return
+        else:
+            conn.sendall(b"PROCEED_WITH_UPLOAD\n")
+    else:
+        conn.sendall(b"PROCEED_WITH_UPLOAD\n")
+    with open(file_path, 'wb') as f:
+        while True:
+            chunk = conn.recv(4096)
+            if not chunk:  # break when all chunks are received
+                break
+            f.write(chunk)
+    print(f"File {file_name} uploaded successfully")
+
+
+def send_file_list(conn):
+    '''Send the list of files in the ServerShare directory to the client.'''
+    files = os.listdir("ServerShare")
+    response = "\n".join(files) + "\n"
+    conn.sendall(response.encode())
 
 
 def main():
@@ -73,23 +105,19 @@ def main():
                 print(f"Server got a connection from {addr}")
 
                 header = recv_line(conn)
+                if not header.strip():  # check if header is empty or just whitespace
+                    print("Received an empty header from client. Ignoring...")
+                    continue  # go to the next iteration of the loop
                 command, *args = header.split(maxsplit=1)
 
                 if command == "download":
                     handle_download(conn, args)
 
                 elif command == "upload":
-                    file_name, size = args[0].split(maxsplit=1)
-                    size = int(size)
-                    file_data = conn.recv(size)
-                    with open(f"ServerShare/{file_name}", 'wb') as f:
-                        f.write(file_data)
-                    print(f"File {file_name} uploaded successfully from {addr}")
+                    handle_upload(conn, args)
 
                 elif command == "list_files":
-                    files = os.listdir("ServerShare")
-                    response = "\n".join(files) + "\n"
-                    conn.sendall(response.encode())
+                    send_file_list(conn)
 
                 else:
                     print("Connection got from an incompatible client")

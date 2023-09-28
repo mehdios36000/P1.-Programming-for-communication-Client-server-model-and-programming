@@ -1,39 +1,56 @@
 # xFx Protocol
 
-The client establishes a connection with the server and *informs* the server about the intended action, which could be *list_files*, *download*, or *upload* a file using a *header*.
+The \`xFx Protocol\` facilitates file operations between a client and server. This document outlines the supported operations and their corresponding communication structures.
 
-## List Files
+## 1. Establishing a Connection
 
-If the client wants to list all shareable files on the server:
-- **Header sent from the client:**
-  - `list_files\n`
+To initiate any action, the client must first establish a connection with the server. Once connected, the client sends a *header* to inform the server about the intended operation.
 
-Upon receiving this header, the server responds with the names of all shareable files in the ServerShare directory.
-- **Response from the server:**
-  - `[file1 name]\n[file2 name]\n...`
+## 2. Operations
 
-## Download
+### 2.1. List Files
 
-If the client wants to download a file, then the header will be:
-- `download [file name] [MD5 hash (optional)] [offset (optional)]\n`
+When the client wishes to view all shareable files on the server:
 
-Upon receiving this header, the server searches for the specified file:
-- If the file is not found, then the server replies with:
-  - **Response from the server:**
-    - `NOT FOUND\n`
-- If the file is found and the MD5 hash matches (indicating no changes since the last check), then the server replies with:
-  - **Response from the server:**
-    - `FILE_UNCHANGED\n`
-- If the file is found and either there's no MD5 hash or the MD5 hash is different, the server replies:
-  - **Response from the server:**
-    - `OK [file size]\n`
-  - followed by the bytes of the file starting from the optional offset (if provided).
+- **Client Header:**
 
-## Upload
+`list_files\n`
 
-If the client wants to upload a file, then the header will be:
-- `upload [file name] [file size]\n`
+- **Server Response:**
+The server replies with the names of all shareable files in the ServerShare directory:
+`[file1 name]\n [file2 name]\n ...`
 
-After sending the header, the client sends the bytes of the file.
 
-Upon successfully receiving and saving the file, the server logs that the file has been uploaded successfully from the client's address but does not send a confirmation to the client.
+### 2.2. Download
+
+To download a file, the client sends the following:
+
+- **Client Header:**
+
+`download [file name] [MD5 hash (optional)] [offset (optional)]\n`
+
+- **Server Responses:**
+
+  - If the file is not found:
+    `NOT FOUND\n`
+  - If the file is found and the MD5 hash matches (no changes since the last check):
+    `FILE_UNCHANGED\n`
+  - If the file is found but either there's no MD5 hash or the hash differs:
+    `OK [file size]\n`
+    This is followed by the bytes of the file, starting from the optional offset (if provided).
+
+### 2.3. Upload
+
+To upload a file:
+
+- **Client Header:**
+`upload [file name] [MD5 hash]\n`
+
+- **Server Responses:**
+
+  - If the uploaded file's hash matches an existing file on the server:
+    `FILE_UNCHANGED\n`
+  - If the file doesn't match or doesn't exist on the server:
+    `PROCEED_WITH_UPLOAD\n`
+
+  After receiving `PROCEED_WITH_UPLOAD\n`, the client sends the bytes of the file. The server successfully receives and saves the file and logs the event. No confirmation is sent to the client.
